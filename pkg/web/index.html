@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetAIGuard - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .header {
+            background-color: #343a40;
+            color: white;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border-radius: 0.5rem;
+        }
+        .card-header {
+            font-weight: 600;
+            border-radius: 0.5rem 0.5rem 0 0 !important;
+        }
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        .status-ok {
+            background-color: #28a745;
+        }
+        .status-error {
+            background-color: #dc3545;
+        }
+        .status-unknown {
+            background-color: #ffc107;
+        }
+        .table-actions {
+            width: 120px;
+        }
+        .refresh-button {
+            cursor: pointer;
+        }
+        .settings-panel {
+            background-color: #f1f3f5;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .stats-card {
+            text-align: center;
+            padding: 1rem;
+        }
+        .stats-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        .stats-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        .dashboard-title {
+            margin-bottom: 1.5rem;
+        }
+        .card-title-with-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer {
+            background-color: #f1f3f5;
+            padding: 1rem 0;
+            margin-top: 2rem;
+            text-align: center;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-shield-check"></i> NetAIGuard</h1>
+            <span id="last-updated">Оновлено: -</span>
+        </div>
+    </div>
+</div>
+
+<div class="container mb-4">
+    <div class="row">
+        <!-- Статус системи -->
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="card-title-with-button">
+                        <span>Статус системи</span>
+                        <i class="bi bi-arrow-clockwise refresh-button" title="Оновити дані"
+                           onclick="updateSystemStatus()"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="status-indicator" id="api-status-indicator"></span>
+                                <div>
+                                    <strong>API Сервер:</strong>
+                                    <span id="api-status">Перевірка...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="status-indicator" id="ebpf-status-indicator"></span>
+                                <div>
+                                    <strong>eBPF Агент:</strong>
+                                    <span id="ebpf-status">Перевірка...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="status-indicator" id="ai-status-indicator"></span>
+                                <div>
+                                    <strong>AI Сервер:</strong>
+                                    <span id="ai-status">Перевірка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Статистика трафіку -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">Статистика трафіку</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-value" id="total-ips">-</div>
+                                <div class="stats-label">IP адрес</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-value" id="blocked-count">-</div>
+                                <div class="stats-label">Заблоковано</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="runAnalysis()">
+                        <i class="bi bi-play-fill"></i> Запустити аналіз
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Налаштування -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">Налаштування захисту</div>
+                <div class="card-body">
+                    <form id="settings-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="rate-limit" class="form-label">Обмеження швидкості (пакетів/сек)</label>
+                                <input type="number" class="form-control" id="rate-limit" min="1" value="100">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="auto-block" class="form-label">Автоматичне блокування</label>
+                                <select class="form-select" id="auto-block">
+                                    <option value="enabled" selected>Увімкнено</option>
+                                    <option value="disabled">Вимкнено</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                            <i class="bi bi-save"></i> Зберегти налаштування
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Таблиця заблокованих IP -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <div class="card-title-with-button">
+                        <span>Заблоковані IP</span>
+                        <i class="bi bi-arrow-clockwise refresh-button" title="Оновити дані"
+                           onclick="getBlockedIPs()"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                            <tr>
+                                <th>IP адреса</th>
+                                <th>Дії</th>
+                            </tr>
+                            </thead>
+                            <tbody id="blocked-ips-table">
+                            <tr>
+                                <td colspan="2" class="text-center">Завантаження даних...</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Активні з'єднання -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <div class="card-title-with-button">
+                        <span>Активні IP (Top 10)</span>
+                        <i class="bi bi-arrow-clockwise refresh-button" title="Оновити дані"
+                           onclick="getTrafficStats()"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                            <tr>
+                                <th>IP адреса</th>
+                                <th>Пакети</th>
+                                <th>Байти</th>
+                                <th>Дії</th>
+                            </tr>
+                            </thead>
+                            <tbody id="traffic-stats-table">
+                            <tr>
+                                <td colspan="4" class="text-center">Завантаження даних...</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Останні аномалії -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <div class="card-title-with-button">
+                        <span>Останні аномалії та рекомендації</span>
+                        <i class="bi bi-arrow-clockwise refresh-button" title="Оновити дані"
+                           onclick="runAnalysis()"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                            <tr>
+                                <th>IP адреса</th>
+                                <th>Дія</th>
+                                <th>Причина</th>
+                                <th>Впевненість</th>
+                                <th>Дії</th>
+                            </tr>
+                            </thead>
+                            <tbody id="anomalies-table">
+                            <tr>
+                                <td colspan="5" class="text-center">Запустіть аналіз для отримання даних</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <div class="container">
+        <p>&copy; 2023 NetAIGuard - Система захисту мережі на основі eBPF та AI</p>
+    </div>
+</div>
+
+<!-- Модальне вікно блокування IP -->
+<div class="modal fade" id="blockIpModal" tabindex="-1" aria-labelledby="blockIpModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="blockIpModalLabel">Блокування IP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="block-ip-form">
+                    <div class="mb-3">
+                        <label for="ip-address" class="form-label">IP адреса</label>
+                        <input type="text" class="form-control" id="ip-address" placeholder="наприклад, 192.168.1.1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-danger" onclick="blockIP()">Заблокувати</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Базова URL для API
+    const API_URL = 'http://localhost:8081/api';
+
+    // Модальні вікна
+    let blockIpModal;
+
+    // Ініціалізація при завантаженні сторінки
+    document.addEventListener('DOMContentLoaded', function () {
+        // Ініціалізація модальних вікон
+        blockIpModal = new bootstrap.Modal(document.getElementById('blockIpModal'));
+
+        // Завантаження початкових даних
+        updateSystemStatus();
+        getBlockedIPs();
+        getTrafficStats();
+    });
+
+    // Функція для оновлення часу останнього оновлення
+    function updateLastUpdatedTime() {
+        const now = new Date();
+        document.getElementById('last-updated').textContent = `Оновлено: ${now.toLocaleTimeString()}`;
+    }
+
+    // Функція для встановлення індикатора статусу
+    function setStatusIndicator(elementId, status) {
+        const indicator = document.getElementById(elementId);
+        const statusText = document.getElementById(status);
+
+        if (status === 'ok') {
+            indicator.className = 'status-indicator status-ok';
+            statusText.textContent = 'OK';
+        } else if (status === 'error') {
+            indicator.className = 'status-indicator status-error';
+            statusText.textContent = 'Помилка';
+        } else {
+            indicator.className = 'status-indicator status-unknown';
+            statusText.textContent = 'Недоступний';
+        }
+    }
+
+    // Перевірка статусу системи
+    async function updateSystemStatus() {
+        try {
+            const response = await fetch(`${API_URL}/health`);
+            const data = await response.json();
+            
+            // Оновлення індикаторів статусу
+            setStatusIndicator('api-status-indicator', data.components.api_server.status);
+            setStatusIndicator('ebpf-status-indicator', data.components.ebpf_agent.status);
+            setStatusIndicator('ai-status-indicator', data.components.ai_server.status);
+            
+            // Оновлення часу
+            updateLastUpdatedTime();
+        } catch (error) {
+            console.error('Error fetching system status:', error);
+            // Встановлення всіх індикаторів в unknown
+            setStatusIndicator('api-status-indicator', 'unavailable');
+            setStatusIndicator('ebpf-status-indicator', 'unavailable');
+            setStatusIndicator('ai-status-indicator', 'unavailable');
+        }
+    }
+
+    // Отримання списку заблокованих IP
+    async function getBlockedIPs() {
+        try {
+            const response = await fetch(`${API_URL}/blocked`);
+            const data = await response.json();
+            
+            // Оновлення лічильника заблокованих IP
+            document.getElementById('blocked-count').textContent = data.count || 0;
+            
+            // Оновлення таблиці
+            const tableBody = document.getElementById('blocked-ips-table');
+            
+            if (!data.blocked_ips || data.blocked_ips.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="2" class="text-center">Немає заблокованих IP</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            data.blocked_ips.forEach(ip => {
+                html += `
+                <tr>
+                    <td>${ip}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="unblockIP('${ip}')">
+                            <i class="bi bi-unlock"></i> Розблокувати
+                        </button>
+                    </td>
+                </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+            updateLastUpdatedTime();
+        } catch (error) {
+            console.error('Error fetching blocked IPs:', error);
+            document.getElementById('blocked-ips-table').innerHTML = 
+                '<tr><td colspan="2" class="text-center text-danger">Помилка завантаження даних</td></tr>';
+        }
+    }
+
+    // Отримання статистики трафіку
+    async function getTrafficStats() {
+        try {
+            const response = await fetch(`${API_URL}/stats`);
+            const data = await response.json();
+            
+            // Конвертація об'єкта в масив і сортування за кількістю пакетів
+            const ips = Object.keys(data).map(ip => ({
+                ip,
+                packets: data[ip].packets,
+                bytes: data[ip].bytes,
+                last_seen: data[ip].last_seen
+            })).sort((a, b) => b.packets - a.packets);
+            
+            // Оновлення загальної кількості IP
+            document.getElementById('total-ips').textContent = ips.length;
+            
+            // Оновлення таблиці (лише top 10)
+            const tableBody = document.getElementById('traffic-stats-table');
+            
+            if (ips.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Немає даних про трафік</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            ips.slice(0, 10).forEach(ip => {
+                html += `
+                <tr>
+                    <td>${ip.ip}</td>
+                    <td>${ip.packets}</td>
+                    <td>${formatBytes(ip.bytes)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="blockSpecificIP('${ip.ip}')">
+                            <i class="bi bi-shield-fill-x"></i> Блокувати
+                        </button>
+                    </td>
+                </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+            updateLastUpdatedTime();
+        } catch (error) {
+            console.error('Error fetching traffic stats:', error);
+            document.getElementById('traffic-stats-table').innerHTML = 
+                '<tr><td colspan="4" class="text-center text-danger">Помилка завантаження даних</td></tr>';
+        }
+    }
+
+    // Форматування байтів у читабельний формат
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    // Запуск аналізу трафіку
+    async function runAnalysis() {
+        try {
+            const response = await fetch(`${API_URL}/analyze`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+            
+            const data = await response.json();
+            
+            // Оновлення таблиці аномалій
+            const tableBody = document.getElementById('anomalies-table');
+            
+            if (!data.recommendations || data.recommendations.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Аномалій не виявлено</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            data.recommendations.forEach(rec => {
+                const confidence = Math.round(rec.confidence * 100);
+                const confidenceClass = confidence > 80 ? 'text-danger' : 
+                                       confidence > 60 ? 'text-warning' : 'text-success';
+                
+                html += `
+                <tr>
+                    <td>${rec.ip}</td>
+                    <td>${getActionLabel(rec.action)}</td>
+                    <td>${rec.reason}</td>
+                    <td class="${confidenceClass}">${confidence}%</td>
+                    <td>
+                        ${getActionButton(rec.ip, rec.action)}
+                    </td>
+                </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
+            updateLastUpdatedTime();
+            
+            // Додатково оновлюємо статистику
+            getBlockedIPs();
+            getTrafficStats();
+        } catch (error) {
+            console.error('Error running analysis:', error);
+            document.getElementById('anomalies-table').innerHTML = 
+                '<tr><td colspan="5" class="text-center text-danger">Помилка під час аналізу</td></tr>';
+        }
+    }
+
+    // Отримання підпису для дії
+    function getActionLabel(action) {
+        switch (action) {
+            case 'block':
+                return '<span class="badge bg-danger">Блокувати</span>';
+            case 'rate_limit':
+                return '<span class="badge bg-warning text-dark">Обмежити</span>';
+            case 'monitor':
+                return '<span class="badge bg-info text-dark">Моніторити</span>';
+            default:
+                return '<span class="badge bg-secondary">Невідома дія</span>';
+        }
+    }
+
+    // Отримання кнопки дії на основі рекомендації
+    function getActionButton(ip, action) {
+        switch (action) {
+            case 'block':
+                return `
+                <button class="btn btn-sm btn-danger" onclick="blockSpecificIP('${ip}')">
+                    <i class="bi bi-shield-fill-x"></i> Блокувати
+                </button>
+                `;
+            case 'rate_limit':
+                return `
+                <button class="btn btn-sm btn-warning" onclick="blockSpecificIP('${ip}')">
+                    <i class="bi bi-shield-fill-x"></i> Блокувати
+                </button>
+                `;
+            case 'monitor':
+                return `
+                <button class="btn btn-sm btn-info" onclick="blockSpecificIP('${ip}')">
+                    <i class="bi bi-shield-fill-x"></i> Блокувати
+                </button>
+                `;
+            default:
+                return '';
+        }
+    }
+
+    // Блокування конкретного IP
+    function blockSpecificIP(ip) {
+        document.getElementById('ip-address').value = ip;
+        blockIpModal.show();
+    }
+
+    // Відкриття модального вікна блокування IP
+    function showBlockIpModal() {
+        document.getElementById('ip-address').value = '';
+        blockIpModal.show();
+    }
+
+    // Блокування IP
+    async function blockIP() {
+        const ip = document.getElementById('ip-address').value.trim();
+        
+        if (!ip) {
+            alert('Введіть IP адресу');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/block`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ip })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                alert(`IP ${ip} успішно заблоковано`);
+                blockIpModal.hide();
+                getBlockedIPs();
+            } else {
+                alert(`Помилка: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error blocking IP:', error);
+            alert('Помилка при блокуванні IP');
+        }
+    }
+
+    // Розблокування IP
+    async function unblockIP(ip) {
+        if (!confirm(`Ви впевнені, що хочете розблокувати IP ${ip}?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/unblock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ip })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                alert(`IP ${ip} успішно розблоковано`);
+                getBlockedIPs();
+            } else {
+                alert(`Помилка: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error unblocking IP:', error);
+            alert('Помилка при розблокуванні IP');
+        }
+    }
+
+    // Збереження налаштувань
+    async function saveSettings() {
+        const rateLimit = parseInt(document.getElementById('rate-limit').value);
+        
+        if (isNaN(rateLimit) || rateLimit < 1) {
+            alert('Введіть коректне значення для обмеження швидкості');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/rate-limit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rate_limit: rateLimit })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                alert('Налаштування успішно збережені');
+            } else {
+                alert(`Помилка: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            alert('Помилка при збереженні налаштувань');
+        }
+    }
+</script>
+
+</body>
+</html>
